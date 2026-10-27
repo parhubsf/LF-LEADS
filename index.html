@@ -2,85 +2,94 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="LF Leads — prospecção e gestão comercial de empresas.">
-  <title>LF Leads | Prospecção Empresarial</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LF Leads — Prospecção Empresarial</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="config.js"></script>
+  <script defer src="app.js"></script>
 </head>
 <body>
-  <aside class="sidebar">
-    <div class="brand"><div class="brand-mark">LF</div><div><strong>LF Leads</strong><small>PROSPECÇÃO EMPRESARIAL</small></div></div>
-    <nav>
-      <a class="nav-item active" href="#dashboard" data-view="dashboard"><span>▦</span> Visão geral</a>
-      <a class="nav-item" href="#leads" data-view="leads"><span>◫</span> Base de empresas</a>
-      <a class="nav-item" href="#pipeline" data-view="pipeline"><span>⇢</span> Funil comercial</a>
-    </nav>
-    <div class="sidebar-bottom"><div class="avatar">LF</div><div><strong>LF Intermediação</strong><small>Área comercial</small></div></div>
-  </aside>
+  <section id="auth-screen" class="auth-wrap">
+    <form id="login-form" class="auth-card">
+      <div class="brand-mark">LF</div>
+      <p class="eyebrow">LF INTERMEDIAÇÃO / COMERCIAL</p>
+      <h1>LF Leads</h1>
+      <p class="muted">Entre para acessar sua base de prospecção.</p>
+      <label for="email">E-mail</label>
+      <input id="email" type="email" autocomplete="username" required placeholder="seu@email.com">
+      <label for="password">Senha</label>
+      <input id="password" type="password" autocomplete="current-password" required placeholder="Sua senha">
+      <button type="submit" class="primary full">Entrar</button>
+      <p id="auth-message" class="message" role="status"></p>
+      <p class="small muted">O acesso é liberado para usuários cadastrados no Supabase.</p>
+    </form>
+  </section>
 
-  <main class="main">
-    <header class="topbar">
-      <div><p class="eyebrow">LF INTERMEDIAÇÃO / COMERCIAL</p><h1 id="page-title">Visão geral</h1></div>
-      <div class="top-actions"><button class="btn btn-light" id="import-top">↑ Importar CSV</button><button class="btn btn-primary" id="add-top">＋ Novo lead</button></div>
-    </header>
+  <div id="app-shell" class="shell hidden">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">LF</div><div><strong>LF Leads</strong><small>PROSPECÇÃO EMPRESARIAL</small></div></div>
+      <nav>
+        <button class="nav-item active" data-view="overview">▦ &nbsp; Visão geral</button>
+        <button class="nav-item" data-view="database">◫ &nbsp; Base de empresas</button>
+        <button class="nav-item" data-view="pipeline">⇢ &nbsp; Funil comercial</button>
+      </nav>
+      <div class="sidebar-footer"><strong>LF Intermediação</strong><small>Área comercial</small><button id="logout-btn" class="logout">Sair da conta</button></div>
+    </aside>
 
-    <section id="view-dashboard" class="view">
-      <div class="welcome"><div><p class="eyebrow light">PAINEL COMERCIAL</p><h2>Transforme contatos em oportunidades.</h2><p>Acompanhe sua prospecção empresarial em um só lugar.</p></div><div class="welcome-icon">↗</div></div>
-      <div class="stats">
-        <article class="stat-card"><div class="stat-label">Total de empresas <span>▤</span></div><strong id="stat-total">0</strong><small>Na sua base comercial</small></article>
-        <article class="stat-card"><div class="stat-label">Novos leads <span>✳</span></div><strong id="stat-new">0</strong><small>Na etapa inicial</small></article>
-        <article class="stat-card"><div class="stat-label">Em negociação <span>⇢</span></div><strong id="stat-negotiation">0</strong><small>Interessados e em cadastro</small></article>
-        <article class="stat-card"><div class="stat-label">Contas abertas <span>✓</span></div><strong id="stat-won">0</strong><small>Conversões concluídas</small></article>
-      </div>
-      <div class="content-grid">
-        <section class="panel"><div class="panel-heading"><div><h3>Leads recentes</h3><p>Últimas empresas adicionadas à base</p></div><button class="text-btn" data-goto="leads">Ver todos →</button></div><div id="recent-leads" class="recent-list"></div></section>
-        <section class="panel"><div class="panel-heading"><div><h3>Etapas do funil</h3><p>Distribuição das oportunidades</p></div></div><div id="stage-summary" class="stage-summary"></div></section>
-      </div>
-      <div class="notice"><strong>Privacidade e uso responsável</strong><p>Cadastre apenas dados empresariais pertinentes à prospecção, respeite a origem e as condições de uso das listas e registre pedidos para não receber contatos. Não use esta ferramenta para contornar bloqueios judiciais ou tratar informações sigilosas.</p></div>
-    </section>
-
-    <section id="view-leads" class="view hidden">
-      <div class="panel">
-        <div class="panel-heading leads-heading"><div><h3>Base de empresas</h3><p id="lead-count-label">0 empresas cadastradas</p></div><div class="heading-actions"><button class="btn btn-light" id="import-main">↑ Importar CSV</button><button class="btn btn-light" id="export-main">↓ Exportar CSV</button><button class="btn btn-primary" id="add-main">＋ Novo lead</button></div></div>
-        <div class="filters">
-          <label class="search-box"><span>⌕</span><input id="search" type="search" placeholder="Buscar por empresa, CNPJ, cidade ou contato…"></label>
-          <select id="filter-stage"><option value="">Todas as etapas</option></select>
-          <select id="filter-state"><option value="">Todos os estados</option></select>
-          <select id="filter-segment"><option value="">Todos os segmentos</option></select>
+    <main class="main">
+      <header class="topbar">
+        <div><p class="eyebrow">LF INTERMEDIAÇÃO / COMERCIAL</p><h1 id="page-title">Visão geral</h1></div>
+        <div class="top-actions"><button id="import-btn" class="secondary">Importar CSV</button><button id="new-lead-btn" class="primary">+ Novo lead</button><input id="csv-input" type="file" accept=".csv,text/csv" hidden></div>
+      </header>
+      <div id="app-message" class="message" role="status"></div>
+      <section id="overview-view" class="view">
+        <div class="hero"><p class="eyebrow">PAINEL COMERCIAL</p><h2>Transforme contatos em oportunidades.</h2><p>Acompanhe sua prospecção empresarial em um só lugar.</p></div>
+        <div class="stats">
+          <article class="stat"><span>Total de empresas</span><strong id="stat-total">0</strong><small>Na sua base comercial</small></article>
+          <article class="stat"><span>Novos leads</span><strong id="stat-new">0</strong><small>Na etapa inicial</small></article>
+          <article class="stat"><span>Em negociação</span><strong id="stat-negotiation">0</strong><small>Interessados e em cadastro</small></article>
+          <article class="stat"><span>Contas abertas</span><strong id="stat-opened">0</strong><small>Conversões concluídas</small></article>
         </div>
-        <div class="table-wrap"><table><thead><tr><th>EMPRESA</th><th>LOCALIZAÇÃO</th><th>SEGMENTO</th><th>CONTATO</th><th>ETAPA</th><th></th></tr></thead><tbody id="lead-table"></tbody></table></div>
-        <div id="empty-state" class="empty-state hidden"><div>⌕</div><h3>Nenhuma empresa encontrada</h3><p>Adicione um lead ou ajuste os filtros.</p><button class="btn btn-primary" id="empty-add">＋ Adicionar empresa</button></div>
-      </div>
-      <p class="footnote">Os dados deste protótipo ficam salvos neste navegador. Para compartilhar entre dispositivos ou usuários, será necessário conectar um banco de dados com autenticação.</p>
-    </section>
+        <div class="panel"><div class="panel-head"><div><h3>Leads recentes</h3><p class="muted">Últimas empresas adicionadas à base</p></div><button class="text-btn" data-go="database">Ver todos →</button></div><div id="recent-list" class="recent-list empty-state">Ainda não há leads. Adicione uma empresa ou importe uma lista CSV.</div></div>
+      </section>
 
-    <section id="view-pipeline" class="view hidden">
-      <div class="panel"><div class="panel-heading"><div><h3>Funil comercial</h3><p>Acompanhe o avanço de cada oportunidade.</p></div></div><div id="pipeline-board" class="pipeline-board"></div></div>
-    </section>
-  </main>
+      <section id="database-view" class="view hidden">
+        <div class="panel">
+          <div class="filters">
+            <input id="search-input" type="search" placeholder="Buscar empresa, CNPJ, cidade ou contato…">
+            <select id="stage-filter"><option value="">Todas as etapas</option></select>
+            <select id="state-filter"><option value="">Todos os estados</option></select>
+            <select id="segment-filter"><option value="">Todos os segmentos</option></select>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>Empresa</th><th>CNPJ</th><th>Segmento</th><th>Localização</th><th>Etapa</th><th>Ações</th></tr></thead><tbody id="leads-table"></tbody></table></div>
+          <div id="table-empty" class="empty-state">Nenhuma empresa cadastrada.</div>
+        </div>
+      </section>
 
-  <input type="file" id="csv-file" accept=".csv,text/csv" hidden>
+      <section id="pipeline-view" class="view hidden"><div id="pipeline-board" class="pipeline-board"></div></section>
+    </main>
+  </div>
+
   <dialog id="lead-dialog">
-    <form id="lead-form" method="dialog">
-      <div class="dialog-head"><div><p class="eyebrow">CADASTRO COMERCIAL</p><h2 id="dialog-title">Novo lead</h2></div><button type="button" class="icon-btn" id="close-dialog" aria-label="Fechar">×</button></div>
+    <form id="lead-form" class="dialog-form">
+      <div class="dialog-head"><div><p class="eyebrow">BASE COMERCIAL</p><h2 id="dialog-title">Novo lead</h2></div><button type="button" id="close-dialog" class="icon-btn" aria-label="Fechar">×</button></div>
       <input type="hidden" id="lead-id">
       <div class="form-grid">
-        <label class="full">Razão social / nome da empresa *<input id="company" required maxlength="180" placeholder="Ex.: Empresa Exemplo Ltda."></label>
-        <label>CNPJ<input id="cnpj" inputmode="numeric" maxlength="18" placeholder="00.000.000/0000-00"></label>
-        <label>Segmento<select id="segment"><option value="">Selecione</option><option>Transporte e logística</option><option>Distribuição e atacado</option><option>Indústria</option><option>Construção civil</option><option>Serviços B2B</option><option>Comércio</option><option>Tecnologia</option><option>Outro</option></select></label>
-        <label>Estado<select id="state"><option value="">Selecione</option></select></label>
-        <label>Cidade<input id="city" maxlength="100" placeholder="Cidade"></label>
-        <label>Telefone comercial<input id="phone" maxlength="40" placeholder="(11) 0000-0000"></label>
-        <label>E-mail comercial<input id="email" type="email" maxlength="160" placeholder="contato@empresa.com.br"></label>
-        <label>Responsável / contato<input id="contact" maxlength="120" placeholder="Nome do contato"></label>
-        <label>Origem<select id="source"><option>Pesquisa pública</option><option>Indicação</option><option>LinkedIn</option><option>Plataforma B2B</option><option>Evento / networking</option><option>Importação CSV</option><option>Outro</option></select></label>
-        <label>Etapa comercial<select id="stage"></select></label>
-        <label class="full">Próxima ação / observações<textarea id="notes" rows="3" maxlength="1200" placeholder="Ex.: ligar na quinta-feira; solicitou apresentação institucional."></textarea></label>
+        <label class="span-2">Nome da empresa *<input id="company_name" required maxlength="180"></label>
+        <label>CNPJ<input id="cnpj" maxlength="18"></label>
+        <label>Segmento<input id="segment" maxlength="100"></label>
+        <label>Estado (UF)<input id="state" maxlength="2"></label>
+        <label>Cidade<input id="city" maxlength="100"></label>
+        <label>Telefone<input id="phone" maxlength="40"></label>
+        <label>E-mail<input id="lead-email" type="email" maxlength="180"></label>
+        <label>Contato<input id="contact" maxlength="140"></label>
+        <label>Origem<input id="source" maxlength="100" placeholder="Ex.: indicação, pesquisa"></label>
+        <label>Etapa<select id="stage"></select></label>
+        <label class="span-2">Observações<textarea id="notes" rows="3" maxlength="3000"></textarea></label>
       </div>
-      <div class="dialog-actions"><button type="button" class="btn btn-light" id="cancel-dialog">Cancelar</button><button type="submit" class="btn btn-primary">Salvar lead</button></div>
+      <div class="dialog-actions"><button type="button" id="cancel-dialog" class="secondary">Cancelar</button><button type="submit" class="primary">Salvar lead</button></div>
     </form>
   </dialog>
-  <div id="toast" class="toast" role="status"></div>
-  <script src="app.js"></script>
 </body>
 </html>
