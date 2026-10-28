@@ -21,7 +21,9 @@
       authNotice("Não foi possível carregar a biblioteca de conexão. Atualize a página e tente novamente.", "error");
       return false;
     }
-    supabaseClient = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY);
+    supabaseClient = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storage: window.localStorage }
+    });
     return true;
   }
 
@@ -201,9 +203,30 @@
     ["search-input","stage-filter","state-filter","segment-filter"].forEach(id=>$(id).addEventListener(id==="search-input"?"input":"change",renderTable));
     document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
     document.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.go)));
-    const {data:{session}} = await supabaseClient.auth.getSession();
-    if(session?.user){showApp(session.user); await loadLeads()} else showLogin();
-    supabaseClient.auth.onAuthStateChange((_event,session)=>{if(!session)showLogin()});
+    // Restore the saved session and avoid treating INITIAL_SESSION as logout.
+    supabaseClient.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT") {
+        leads = [];
+        showLogin();
+        return;
+      }
+      if (session?.user && ["SIGNED_IN", "TOKEN_REFRESHED", "USER_UPDATED"].includes(event)) {
+        showApp(session.user);
+      }
+    });
+
+    const { data: { session }, error } = await supabaseClient.auth.getSession();
+    if (error) {
+      showLogin();
+      authNotice("Não foi possível restaurar sua sessão. Entre novamente.", "error");
+      return;
+    }
+    if (session?.user) {
+      showApp(session.user);
+      await loadLeads();
+    } else {
+      showLogin();
+    }
   }
   document.addEventListener("DOMContentLoaded", start);
 })();
