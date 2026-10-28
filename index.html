@@ -1,95 +1,12 @@
-<!doctype html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LF Leads — Prospecção Empresarial</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script defer src="config.js"></script>
-  <script defer src="app.js"></script>
-</head>
-<body>
-  <section id="auth-screen" class="auth-wrap">
-    <form id="login-form" class="auth-card">
-      <div class="brand-mark">LF</div>
-      <p class="eyebrow">LF INTERMEDIAÇÃO / COMERCIAL</p>
-      <h1>LF Leads</h1>
-      <p class="muted">Entre para acessar sua base de prospecção.</p>
-      <label for="email">E-mail</label>
-      <input id="email" type="email" autocomplete="username" required placeholder="seu@email.com">
-      <label for="password">Senha</label>
-      <input id="password" type="password" autocomplete="current-password" required placeholder="Sua senha">
-      <button type="submit" class="primary full">Entrar</button>
-      <p id="auth-message" class="message" role="status"></p>
-      <p class="small muted">O acesso é liberado para usuários cadastrados no Supabase.</p>
-    </form>
-  </section>
-
-  <div id="app-shell" class="shell hidden">
-    <aside class="sidebar">
-      <div class="brand"><div class="brand-mark">LF</div><div><strong>LF Leads</strong><small>PROSPECÇÃO EMPRESARIAL</small></div></div>
-      <nav>
-        <button class="nav-item active" data-view="overview">▦ &nbsp; Visão geral</button>
-        <button class="nav-item" data-view="database">◫ &nbsp; Base de empresas</button>
-        <button class="nav-item" data-view="pipeline">⇢ &nbsp; Funil comercial</button>
-      </nav>
-      <div class="sidebar-footer"><strong>LF Intermediação</strong><small>Área comercial</small><button id="logout-btn" class="logout">Sair da conta</button></div>
-    </aside>
-
-    <main class="main">
-      <header class="topbar">
-        <div><p class="eyebrow">LF INTERMEDIAÇÃO / COMERCIAL</p><h1 id="page-title">Visão geral</h1></div>
-        <div class="top-actions"><button id="import-btn" class="secondary">Importar CSV</button><button id="new-lead-btn" class="primary">+ Novo lead</button><input id="csv-input" type="file" accept=".csv,text/csv" hidden></div>
-      </header>
-      <div id="app-message" class="message" role="status"></div>
-      <section id="overview-view" class="view">
-        <div class="hero"><p class="eyebrow">PAINEL COMERCIAL</p><h2>Transforme contatos em oportunidades.</h2><p>Acompanhe sua prospecção empresarial em um só lugar.</p></div>
-        <div class="stats">
-          <article class="stat"><span>Total de empresas</span><strong id="stat-total">0</strong><small>Na sua base comercial</small></article>
-          <article class="stat"><span>Novos leads</span><strong id="stat-new">0</strong><small>Na etapa inicial</small></article>
-          <article class="stat"><span>Em negociação</span><strong id="stat-negotiation">0</strong><small>Interessados e em cadastro</small></article>
-          <article class="stat"><span>Contas abertas</span><strong id="stat-opened">0</strong><small>Conversões concluídas</small></article>
-        </div>
-        <div class="panel"><div class="panel-head"><div><h3>Leads recentes</h3><p class="muted">Últimas empresas adicionadas à base</p></div><button class="text-btn" data-go="database">Ver todos →</button></div><div id="recent-list" class="recent-list empty-state">Ainda não há leads. Adicione uma empresa ou importe uma lista CSV.</div></div>
-      </section>
-
-      <section id="database-view" class="view hidden">
-        <div class="panel">
-          <div class="filters">
-            <input id="search-input" type="search" placeholder="Buscar empresa, CNPJ, cidade ou contato…">
-            <select id="stage-filter"><option value="">Todas as etapas</option></select>
-            <select id="state-filter"><option value="">Todos os estados</option></select>
-            <select id="segment-filter"><option value="">Todos os segmentos</option></select>
-          </div>
-          <div class="table-wrap"><table><thead><tr><th>Empresa</th><th>CNPJ</th><th>Segmento</th><th>Localização</th><th>Etapa</th><th>Ações</th></tr></thead><tbody id="leads-table"></tbody></table></div>
-          <div id="table-empty" class="empty-state">Nenhuma empresa cadastrada.</div>
-        </div>
-      </section>
-
-      <section id="pipeline-view" class="view hidden"><div id="pipeline-board" class="pipeline-board"></div></section>
-    </main>
-  </div>
-
-  <dialog id="lead-dialog">
-    <form id="lead-form" class="dialog-form">
-      <div class="dialog-head"><div><p class="eyebrow">BASE COMERCIAL</p><h2 id="dialog-title">Novo lead</h2></div><button type="button" id="close-dialog" class="icon-btn" aria-label="Fechar">×</button></div>
-      <input type="hidden" id="lead-id">
-      <div class="form-grid">
-        <label class="span-2">Nome da empresa *<input id="company_name" required maxlength="180"></label>
-        <label>CNPJ<input id="cnpj" maxlength="18"></label>
-        <label>Segmento<input id="segment" maxlength="100"></label>
-        <label>Estado (UF)<input id="state" maxlength="2"></label>
-        <label>Cidade<input id="city" maxlength="100"></label>
-        <label>Telefone<input id="phone" maxlength="40"></label>
-        <label>E-mail<input id="lead-email" type="email" maxlength="180"></label>
-        <label>Contato<input id="contact" maxlength="140"></label>
-        <label>Origem<input id="source" maxlength="100" placeholder="Ex.: indicação, pesquisa"></label>
-        <label>Etapa<select id="stage"></select></label>
-        <label class="span-2">Observações<textarea id="notes" rows="3" maxlength="3000"></textarea></label>
-      </div>
-      <div class="dialog-actions"><button type="button" id="cancel-dialog" class="secondary">Cancelar</button><button type="submit" class="primary">Salvar lead</button></div>
-    </form>
-  </dialog>
-</body>
-</html>
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LF Leads — CRM Comercial</title><link rel="stylesheet" href="style.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script defer src="config.js"></script><script defer src="app.js"></script></head><body>
+<section id="auth-screen" class="auth-wrap"><form id="login-form" class="auth-card"><div class="brand-mark">LF</div><p class="eyebrow">LF INTERMEDIAÇÃO / COMERCIAL</p><h1>LF Leads</h1><p class="muted">Entre para acessar o CRM comercial.</p><label for="email">E-mail</label><input id="email" type="email" autocomplete="username" required><label for="password">Senha</label><input id="password" type="password" autocomplete="current-password" required><button type="submit" class="primary full">Entrar</button><p id="auth-message" class="message" role="status"></p></form></section>
+<div id="app-shell" class="shell hidden"><aside class="sidebar"><div class="brand"><div class="brand-mark">LF</div><div><strong>LF Leads</strong><small>CRM COMERCIAL</small></div></div><nav><button class="nav-item active" data-view="overview">▦ &nbsp; Visão geral</button><button class="nav-item" data-view="companies">◫ &nbsp; Empresas</button><button class="nav-item" data-view="opportunities">↗ &nbsp; Oportunidades</button><button class="nav-item" data-view="pipeline">⇢ &nbsp; Funil comercial</button><button class="nav-item" data-view="archived">▣ &nbsp; Arquivados</button></nav><div class="sidebar-footer"><strong>LF Intermediação</strong><small id="user-label">Área comercial</small><button id="logout-btn" class="logout">Sair da conta</button></div></aside>
+<main class="main"><header class="topbar"><div><p class="eyebrow">LF INTERMEDIAÇÃO / COMERCIAL</p><h1 id="page-title">Visão geral</h1></div><div class="top-actions"><button id="new-company-btn" class="primary">+ Nova empresa</button><button id="new-opportunity-btn" class="secondary">+ Oportunidade</button></div></header><div id="app-message" class="message" role="status"></div>
+<section id="overview-view" class="view"><div class="hero"><p class="eyebrow">PAINEL COMERCIAL</p><h2>Transforme contatos em oportunidades.</h2><p>Base compartilhada de empresas e operações da equipe.</p></div><div class="stats"><article class="stat"><span>Empresas ativas</span><strong id="stat-companies">0</strong></article><article class="stat"><span>Oportunidades ativas</span><strong id="stat-opportunities">0</strong></article><article class="stat"><span>Em negociação</span><strong id="stat-negotiation">0</strong></article><article class="stat"><span>Operações concluídas</span><strong id="stat-won">0</strong></article></div><div class="panel"><div class="panel-head"><div><h3>Empresas recentes</h3><p class="muted">Registros mais recentes da base compartilhada</p></div><button class="text-btn" data-go="companies">Ver todas →</button></div><div id="recent-list" class="recent-list empty-state">Carregando...</div></div></section>
+<section id="companies-view" class="view hidden"><div class="panel"><div class="filters"><input id="company-search" type="search" placeholder="Buscar empresa, CNPJ, cidade ou contato..."><select id="company-state-filter"><option value="">Todos os estados</option></select></div><div class="table-wrap"><table><thead><tr><th>Empresa</th><th>CNPJ</th><th>Segmento</th><th>Localização</th><th>Contato</th><th>Ações</th></tr></thead><tbody id="companies-table"></tbody></table></div><div id="companies-empty" class="empty-state hidden">Nenhuma empresa encontrada.</div></div></section>
+<section id="opportunities-view" class="view hidden"><div class="panel"><div class="filters"><input id="opportunity-search" type="search" placeholder="Buscar oportunidade ou empresa..."><select id="opportunity-stage-filter"><option value="">Todas as etapas</option></select><select id="product-filter"><option value="">Todos os produtos</option></select></div><div class="table-wrap"><table><thead><tr><th>Oportunidade</th><th>Empresa</th><th>Produto</th><th>Valor estimado</th><th>Etapa</th><th>Próxima ação</th><th>Ações</th></tr></thead><tbody id="opportunities-table"></tbody></table></div><div id="opportunities-empty" class="empty-state hidden">Nenhuma oportunidade encontrada.</div></div></section>
+<section id="pipeline-view" class="view hidden"><div id="pipeline-board" class="pipeline-board"></div></section><section id="archived-view" class="view hidden"><div class="panel"><h3>Registros arquivados</h3><p class="muted">Restaure empresas e oportunidades quando necessário.</p><h4>Empresas</h4><div class="table-wrap"><table><thead><tr><th>Empresa</th><th>CNPJ</th><th>Arquivada em</th><th>Ação</th></tr></thead><tbody id="archived-companies-table"></tbody></table></div><h4>Oportunidades</h4><div class="table-wrap"><table><thead><tr><th>Oportunidade</th><th>Etapa</th><th>Arquivada em</th><th>Ação</th></tr></thead><tbody id="archived-opportunities-table"></tbody></table></div></div></section>
+</main></div>
+<dialog id="company-dialog"><form id="company-form" class="dialog-form"><div class="dialog-head"><div><p class="eyebrow">BASE COMERCIAL</p><h2 id="company-dialog-title">Nova empresa</h2></div><button type="button" class="icon-btn" data-close="company-dialog">×</button></div><input id="company-id" type="hidden"><div class="form-grid"><label class="span-2">Razão social / nome da empresa *<input id="company_name" required maxlength="180"></label><label>Nome fantasia<input id="trade_name" maxlength="180"></label><label>CNPJ<input id="cnpj" maxlength="18"></label><label>Segmento<input id="segment" maxlength="100"></label><label>Estado (UF)<input id="state" maxlength="2"></label><label>Cidade<input id="city" maxlength="100"></label><label>Telefone<input id="phone" maxlength="40"></label><label>E-mail<input id="company-email" type="email" maxlength="180"></label><label>Contato principal<input id="contact" maxlength="140"></label><label>Origem do lead<input id="source" maxlength="100" placeholder="Indicação, pesquisa..."></label><label class="span-2">Observações<textarea id="company-notes" rows="3" maxlength="3000"></textarea></label></div><div class="dialog-actions"><button type="button" class="secondary" data-close="company-dialog">Cancelar</button><button type="submit" class="primary">Salvar empresa</button></div></form></dialog>
+<dialog id="opportunity-dialog"><form id="opportunity-form" class="dialog-form"><div class="dialog-head"><div><p class="eyebrow">COMERCIAL</p><h2 id="opportunity-dialog-title">Nova oportunidade</h2></div><button type="button" class="icon-btn" data-close="opportunity-dialog">×</button></div><input id="opportunity-id" type="hidden"><div class="form-grid"><label class="span-2">Empresa *<select id="opportunity-company" required></select></label><label class="span-2">Nome da oportunidade *<input id="opportunity-title" required maxlength="180" placeholder="Ex.: Antecipação de recebíveis"></label><label>Produto<select id="opportunity-product"><option>Fomento mercantil</option><option>Antecipação de recebíveis</option><option>Securitização</option><option>FIDC</option><option>Outro</option></select></label><label>Valor estimado (R$)<input id="estimated-value" type="number" min="0" step="0.01"></label><label>Parceiro / instituição<input id="partner-institution" maxlength="180"></label><label>Etapa<select id="opportunity-stage"></select></label><label class="span-2">Próxima ação<input id="next-action" maxlength="250" placeholder="Ex.: Solicitar documentos financeiros"></label><label>Data da próxima ação<input id="next-action-at" type="datetime-local"></label><label>Resultado<input id="outcome" maxlength="250"></label><label class="span-2">Observações<textarea id="opportunity-notes" rows="3" maxlength="3000"></textarea></label></div><div class="dialog-actions"><button type="button" class="secondary" data-close="opportunity-dialog">Cancelar</button><button type="submit" class="primary">Salvar oportunidade</button></div></form></dialog>
+</body></html>

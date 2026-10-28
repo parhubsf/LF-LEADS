@@ -1,232 +1,33 @@
 (() => {
-  const STAGES = ["Novo lead", "Contato realizado", "Em negociação", "Em cadastro", "Conta aberta", "Sem interesse"];
-  const $ = (id) => document.getElementById(id);
-  let supabaseClient = null;
-  let leads = [];
-  let activeView = "overview";
-
-  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-  const notice = (msg, type = "") => { $("app-message").textContent = msg; $("app-message").className = "message " + type; };
-  const authNotice = (msg, type = "") => { $("auth-message").textContent = msg; $("auth-message").className = "message " + type; };
-
-  function initConfig() {
-    const cfg = window.LF_LEADS_CONFIG || {};
-    if (!cfg.SUPABASE_URL || cfg.SUPABASE_URL.includes("COLE_AQUI") ||
-        !cfg.SUPABASE_PUBLISHABLE_KEY || cfg.SUPABASE_PUBLISHABLE_KEY.includes("COLE_AQUI")) {
-      authNotice("Falta configurar a URL e a Publishable key no arquivo config.js.", "error");
-      $("login-form").querySelector("button[type=submit]").disabled = true;
-      return false;
-    }
-    if (!window.supabase || !window.supabase.createClient) {
-      authNotice("Não foi possível carregar a biblioteca de conexão. Atualize a página e tente novamente.", "error");
-      return false;
-    }
-    supabaseClient = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storage: window.localStorage }
-    });
-    return true;
-  }
-
-  function showApp(user) {
-    $("auth-screen").classList.add("hidden");
-    $("app-shell").classList.remove("hidden");
-    $("logout-btn").title = user?.email || "";
-  }
-  function showLogin() {
-    $("app-shell").classList.add("hidden");
-    $("auth-screen").classList.remove("hidden");
-  }
-
-  async function loadLeads() {
-    notice("Carregando empresas…");
-    const { data, error } = await supabaseClient.from("leads").select("*").order("created_at", { ascending: false });
-    if (error) {
-      notice("Não foi possível carregar os leads: " + error.message, "error");
-      return;
-    }
-    leads = data || [];
-    renderAll();
-    notice("");
-  }
-
-  function renderAll() {
-    $("stat-total").textContent = leads.length;
-    $("stat-new").textContent = leads.filter(x => x.stage === "Novo lead").length;
-    $("stat-negotiation").textContent = leads.filter(x => ["Em negociação", "Em cadastro"].includes(x.stage)).length;
-    $("stat-opened").textContent = leads.filter(x => x.stage === "Conta aberta").length;
-    $("recent-list").className = "recent-list" + (leads.length ? "" : " empty-state");
-    $("recent-list").innerHTML = leads.length ? leads.slice(0,5).map(x => `<div class="recent-row"><div><strong>${esc(x.company_name)}</strong><small>${esc([x.city,x.state].filter(Boolean).join(" / ") || x.segment || "Sem localização informada")}</small></div><span class="badge">${esc(x.stage)}</span></div>`).join("") : "Ainda não há leads. Adicione uma empresa ou importe uma lista CSV.";
-    renderFilters();
-    renderTable();
-    renderPipeline();
-  }
-
-  function renderFilters() {
-    const currentStage = $("stage-filter").value, currentState = $("state-filter").value, currentSegment = $("segment-filter").value;
-    $("stage-filter").innerHTML = `<option value="">Todas as etapas</option>` + STAGES.map(s=>`<option>${esc(s)}</option>`).join("");
-    $("state-filter").innerHTML = `<option value="">Todos os estados</option>` + [...new Set(leads.map(x=>x.state).filter(Boolean))].sort().map(s=>`<option>${esc(s)}</option>`).join("");
-    $("segment-filter").innerHTML = `<option value="">Todos os segmentos</option>` + [...new Set(leads.map(x=>x.segment).filter(Boolean))].sort().map(s=>`<option>${esc(s)}</option>`).join("");
-    $("stage-filter").value = currentStage; $("state-filter").value = currentState; $("segment-filter").value = currentSegment;
-    $("stage").innerHTML = STAGES.map(s=>`<option>${esc(s)}</option>`).join("");
-  }
-
-  function filteredLeads() {
-    const q = $("search-input").value.trim().toLowerCase();
-    return leads.filter(x => {
-      const haystack = [x.company_name,x.cnpj,x.city,x.state,x.contact,x.email,x.segment].join(" ").toLowerCase();
-      return (!q || haystack.includes(q)) && (!$("stage-filter").value || x.stage === $("stage-filter").value) &&
-        (!$("state-filter").value || x.state === $("state-filter").value) && (!$("segment-filter").value || x.segment === $("segment-filter").value);
-    });
-  }
-
-  function renderTable() {
-    const rows = filteredLeads();
-    $("leads-table").innerHTML = rows.map(x => `<tr>
-      <td><strong>${esc(x.company_name)}</strong><small>${esc(x.contact || x.email || "")}</small></td>
-      <td>${esc(x.cnpj || "—")}</td><td>${esc(x.segment || "—")}</td>
-      <td>${esc([x.city,x.state].filter(Boolean).join(" / ") || "—")}</td>
-      <td><span class="badge">${esc(x.stage)}</span></td>
-      <td class="actions"><button class="table-btn" data-edit="${x.id}">Editar</button><button class="table-btn danger" data-delete="${x.id}">Excluir</button></td>
-    </tr>`).join("");
-    $("table-empty").classList.toggle("hidden", rows.length > 0);
-  }
-
-  function renderPipeline() {
-    $("pipeline-board").innerHTML = STAGES.map(stage => {
-      const items = leads.filter(x=>x.stage===stage);
-      return `<section class="pipeline-column"><header><strong>${esc(stage)}</strong><span>${items.length}</span></header>${items.map(x=>`<article class="pipeline-card"><strong>${esc(x.company_name)}</strong><small>${esc([x.city,x.state].filter(Boolean).join(" / "))}</small><select data-stage-id="${x.id}" aria-label="Alterar etapa de ${esc(x.company_name)}">${STAGES.map(s=>`<option ${s===x.stage?"selected":""}>${esc(s)}</option>`).join("")}</select></article>`).join("") || `<p class="muted small">Nenhum lead</p>`}</section>`;
-    }).join("");
-  }
-
-  function setView(view) {
-    activeView = view;
-    document.querySelectorAll(".view").forEach(el => el.classList.add("hidden"));
-    $(view + "-view").classList.remove("hidden");
-    document.querySelectorAll(".nav-item").forEach(el => el.classList.toggle("active", el.dataset.view === view));
-    $("page-title").textContent = ({overview:"Visão geral",database:"Base de empresas",pipeline:"Funil comercial"})[view];
-  }
-
-  function resetLeadForm() {
-    $("lead-form").reset(); $("lead-id").value = ""; $("dialog-title").textContent = "Novo lead";
-    $("stage").value = STAGES[0];
-  }
-  function openLead(id = null) {
-    resetLeadForm();
-    if (id) {
-      const x = leads.find(l=>l.id===id);
-      if (!x) return;
-      $("dialog-title").textContent = "Editar lead";
-      $("lead-id").value = x.id;
-      for (const field of ["company_name","cnpj","segment","state","city","phone","contact","source","stage","notes"]) $(field).value = x[field] || "";
-      $("lead-email").value = x.email || "";
-    }
-    $("lead-dialog").showModal();
-  }
-  async function saveLead(event) {
-    event.preventDefault();
-    const id = $("lead-id").value;
-    const payload = {
-      company_name: $("company_name").value.trim(),
-      cnpj: $("cnpj").value.trim() || null, segment: $("segment").value.trim() || null,
-      state: $("state").value.trim().toUpperCase() || null, city: $("city").value.trim() || null,
-      phone: $("phone").value.trim() || null, email: $("lead-email").value.trim() || null,
-      contact: $("contact").value.trim() || null, source: $("source").value.trim() || null,
-      stage: $("stage").value, notes: $("notes").value.trim() || null,
-      updated_at: new Date().toISOString()
-    };
-    const result = id
-      ? await supabaseClient.from("leads").update(payload).eq("id", id).select().single()
-      : await supabaseClient.from("leads").insert(payload).select().single();
-    if (result.error) { notice("Não foi possível salvar: " + result.error.message, "error"); return; }
-    $("lead-dialog").close(); await loadLeads();
-  }
-
-  async function deleteLead(id) {
-    const x = leads.find(l=>l.id===id);
-    if (!x || !confirm(`Excluir o lead "${x.company_name}"? Essa ação não pode ser desfeita.`)) return;
-    const { error } = await supabaseClient.from("leads").delete().eq("id", id);
-    if (error) { notice("Não foi possível excluir: " + error.message, "error"); return; }
-    await loadLeads();
-  }
-
-  async function changeStage(id, stage) {
-    const { error } = await supabaseClient.from("leads").update({stage, updated_at:new Date().toISOString()}).eq("id", id);
-    if (error) { notice("Não foi possível alterar a etapa: " + error.message, "error"); return; }
-    await loadLeads();
-  }
-
-  function parseCSV(text) {
-    const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter(l=>l.trim());
-    if (lines.length < 2) return [];
-    const parseLine = (line) => {
-      const out=[]; let cur="", quoted=false;
-      for(let i=0;i<line.length;i++){const c=line[i]; if(c==='"' && line[i+1]==='"' && quoted){cur+='"';i++} else if(c==='"'){quoted=!quoted} else if(c==="," && !quoted){out.push(cur.trim());cur=""} else {cur+=c}}
-      out.push(cur.trim()); return out;
-    };
-    const headers=parseLine(lines[0]).map(h=>h.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,""));
-    const aliases={company_name:["empresa","razaosocial","nome","companyname","company"],cnpj:["cnpj"],segment:["segmento","ramo","segment"],state:["uf","estado","state"],city:["cidade","city"],phone:["telefone","phone"],email:["email","emailcontato"],contact:["contato","responsavel","contact"],source:["origem","source"],stage:["etapa","stage"],notes:["observacoes","observacao","notes"]};
-    return lines.slice(1).map(line=>{
-      const cells=parseLine(line), row={};
-      for(const [field, names] of Object.entries(aliases)){const idx=headers.findIndex(h=>names.includes(h)); if(idx>=0) row[field]=(cells[idx]||"").trim()}
-      if(!row.company_name) row.company_name = row.razao_social || "";
-      return row;
-    }).filter(r=>r.company_name).map(r=>({...r, stage: STAGES.includes(r.stage)?r.stage:"Novo lead"}));
-  }
-
-  async function importCSV(file) {
-    const text = await file.text();
-    const records = parseCSV(text);
-    if (!records.length) { notice("Não encontrei empresas no CSV. Confira o cabeçalho e se o separador é vírgula.", "error"); return; }
-    const { error } = await supabaseClient.from("leads").insert(records);
-    if (error) { notice("Importação não concluída: " + error.message, "error"); return; }
-    notice(`${records.length} lead(s) importado(s) com sucesso.`, "success");
-    await loadLeads();
-  }
-
-  async function start() {
-    if (!initConfig()) return;
-    $("login-form").addEventListener("submit", async (e) => {
-      e.preventDefault(); authNotice("Validando acesso…");
-      const {data,error} = await supabaseClient.auth.signInWithPassword({email:$("email").value.trim(), password:$("password").value});
-      if(error){authNotice("Não foi possível entrar. Confira o e-mail e a senha. " + error.message,"error");return}
-      authNotice(""); showApp(data.user); await loadLeads();
-    });
-    $("logout-btn").addEventListener("click", async()=>{await supabaseClient.auth.signOut(); leads=[]; showLogin();});
-    $("new-lead-btn").addEventListener("click",()=>openLead());
-    $("import-btn").addEventListener("click",()=>$("csv-input").click());
-    $("csv-input").addEventListener("change",async e=>{if(e.target.files[0]) await importCSV(e.target.files[0]);e.target.value=""});
-    $("lead-form").addEventListener("submit",saveLead);
-    $("close-dialog").addEventListener("click",()=>$("lead-dialog").close());
-    $("cancel-dialog").addEventListener("click",()=>$("lead-dialog").close());
-    $("leads-table").addEventListener("click",e=>{const edit=e.target.closest("[data-edit]"), del=e.target.closest("[data-delete]");if(edit)openLead(edit.dataset.edit);if(del)deleteLead(del.dataset.delete)});
-    $("pipeline-board").addEventListener("change",e=>{if(e.target.matches("[data-stage-id]"))changeStage(e.target.dataset.stageId,e.target.value)});
-    ["search-input","stage-filter","state-filter","segment-filter"].forEach(id=>$(id).addEventListener(id==="search-input"?"input":"change",renderTable));
-    document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
-    document.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.go)));
-    // Restore the saved session and avoid treating INITIAL_SESSION as logout.
-    supabaseClient.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_OUT") {
-        leads = [];
-        showLogin();
-        return;
-      }
-      if (session?.user && ["SIGNED_IN", "TOKEN_REFRESHED", "USER_UPDATED"].includes(event)) {
-        showApp(session.user);
-      }
-    });
-
-    const { data: { session }, error } = await supabaseClient.auth.getSession();
-    if (error) {
-      showLogin();
-      authNotice("Não foi possível restaurar sua sessão. Entre novamente.", "error");
-      return;
-    }
-    if (session?.user) {
-      showApp(session.user);
-      await loadLeads();
-    } else {
-      showLogin();
-    }
-  }
-  document.addEventListener("DOMContentLoaded", start);
+  const STAGES = ['Novo lead','Primeiro contato','Qualificação comercial','Documentação em análise','Proposta enviada','Em negociação','Operação aprovada','Operação concluída','Perdido'];
+  const PRODUCTS = ['Fomento mercantil','Antecipação de recebíveis','Securitização','FIDC','Outro'];
+  const $ = id => document.getElementById(id); let sb, user, profile, companies=[], opportunities=[], activeView='overview';
+  const esc = v => String(v ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const msg=(s,t='')=>{ $('app-message').textContent=s; $('app-message').className='message '+t; };
+  const authMsg=(s,t='')=>{ $('auth-message').textContent=s; $('auth-message').className='message '+t; };
+  const money=v=>v==null||v===''?'—':Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  const date=v=>v?new Date(v).toLocaleDateString('pt-BR'):'—';
+  function init(){const c=window.LF_LEADS_CONFIG||{};if(!c.SUPABASE_URL||!c.SUPABASE_PUBLISHABLE_KEY){authMsg('Confira a configuração do Supabase no config.js.','error');return false;}if(!window.supabase){authMsg('Biblioteca de conexão indisponível. Atualize a página.','error');return false;}sb=window.supabase.createClient(c.SUPABASE_URL,c.SUPABASE_PUBLISHABLE_KEY);return true;}
+  function showApp(){ $('auth-screen').classList.add('hidden');$('app-shell').classList.remove('hidden');$('user-label').textContent=(user.email||'')+(profile?.role==='admin'?' · Administrador':' · Colaborador'); }
+  function showLogin(){ $('app-shell').classList.add('hidden');$('auth-screen').classList.remove('hidden'); }
+  async function loadAll(){msg('Carregando CRM...');const [c,o,p]=await Promise.all([sb.from('companies').select('*').is('archived_at',null).order('created_at',{ascending:false}),sb.from('opportunities').select('*, companies(company_name)').is('archived_at',null).order('created_at',{ascending:false}),sb.from('profiles').select('*').eq('user_id',user.id).maybeSingle()]);if(c.error||o.error){msg('Não foi possível carregar as novas tabelas: '+(c.error?.message||o.error?.message),'error');return;}companies=c.data||[];opportunities=o.data||[];profile=p.data;showApp();render();msg('');}
+  function render(){ $('stat-companies').textContent=companies.length;$('stat-opportunities').textContent=opportunities.length;$('stat-negotiation').textContent=opportunities.filter(o=>['Em negociação','Proposta enviada','Documentação em análise'].includes(o.stage)).length;$('stat-won').textContent=opportunities.filter(o=>o.stage==='Operação concluída').length;
+    $('recent-list').className='recent-list'+(companies.length?'':' empty-state');$('recent-list').innerHTML=companies.slice(0,5).map(c=>`<div class="recent-row"><div><strong>${esc(c.company_name)}</strong><small>${esc([c.city,c.state].filter(Boolean).join(' / ')||c.segment||'Sem localização')}</small></div><span class="badge">${esc(c.cnpj||'Empresa')}</span></div>`).join('')||'Ainda não há empresas cadastradas.';
+    const oldState=$('company-state-filter').value;$('company-state-filter').innerHTML='<option value="">Todos os estados</option>'+[...new Set(companies.map(c=>c.state).filter(Boolean))].sort().map(s=>`<option>${esc(s)}</option>`).join('');$('company-state-filter').value=oldState;
+    const oldStage=$('opportunity-stage-filter').value;$('opportunity-stage-filter').innerHTML='<option value="">Todas as etapas</option>'+STAGES.map(s=>`<option>${esc(s)}</option>`).join('');$('opportunity-stage-filter').value=oldStage;
+    const oldProduct=$('product-filter').value;$('product-filter').innerHTML='<option value="">Todos os produtos</option>'+[...new Set(opportunities.map(o=>o.product).filter(Boolean))].sort().map(s=>`<option>${esc(s)}</option>`).join('');$('product-filter').value=oldProduct;
+    $('opportunity-stage').innerHTML=STAGES.map(s=>`<option>${esc(s)}</option>`).join('');$('opportunity-company').innerHTML=companies.map(c=>`<option value="${c.id}">${esc(c.company_name)}</option>`).join('');renderCompanies();renderOpportunities();renderPipeline();loadArchived(); }
+  function renderCompanies(){const q=$('company-search').value.toLowerCase().trim(),st=$('company-state-filter').value;const rows=companies.filter(c=>(!q||[c.company_name,c.trade_name,c.cnpj,c.city,c.state,c.contact,c.email,c.segment].join(' ').toLowerCase().includes(q))&&(!st||c.state===st));$('companies-table').innerHTML=rows.map(c=>`<tr><td><strong>${esc(c.company_name)}</strong><small>${esc(c.trade_name||'')}</small></td><td>${esc(c.cnpj||'—')}</td><td>${esc(c.segment||'—')}</td><td>${esc([c.city,c.state].filter(Boolean).join(' / ')||'—')}</td><td>${esc(c.contact||c.email||c.phone||'—')}</td><td class="actions"><button class="table-btn" data-edit-company="${c.id}">Editar</button><button class="table-btn danger" data-archive-company="${c.id}">Arquivar</button></td></tr>`).join('');$('companies-empty').classList.toggle('hidden',rows.length>0);}
+  function renderOpportunities(){const q=$('opportunity-search').value.toLowerCase().trim(),st=$('opportunity-stage-filter').value,pr=$('product-filter').value;const rows=opportunities.filter(o=>(!q||[o.title,o.companies?.company_name,o.partner_institution,o.product].join(' ').toLowerCase().includes(q))&&(!st||o.stage===st)&&(!pr||o.product===pr));$('opportunities-table').innerHTML=rows.map(o=>`<tr><td><strong>${esc(o.title)}</strong><small>${esc(o.partner_institution||'')}</small></td><td>${esc(o.companies?.company_name||companies.find(c=>c.id===o.company_id)?.company_name||'—')}</td><td>${esc(o.product)}</td><td>${money(o.estimated_value)}</td><td><span class="badge">${esc(o.stage)}</span></td><td>${esc(o.next_action||'—')}<small>${date(o.next_action_at)}</small></td><td class="actions"><button class="table-btn" data-edit-opportunity="${o.id}">Editar</button><button class="table-btn danger" data-archive-opportunity="${o.id}">Arquivar</button></td></tr>`).join('');$('opportunities-empty').classList.toggle('hidden',rows.length>0);}
+  function renderPipeline(){ $('pipeline-board').innerHTML=STAGES.map(s=>{const arr=opportunities.filter(o=>o.stage===s);return `<section class="pipeline-column"><header><strong>${esc(s)}</strong><span>${arr.length}</span></header>${arr.map(o=>`<article class="pipeline-card"><strong>${esc(o.title)}</strong><small>${esc(o.companies?.company_name||companies.find(c=>c.id===o.company_id)?.company_name||'')}</small><small>${money(o.estimated_value)}</small><select data-stage-id="${o.id}" aria-label="Etapa da oportunidade">${STAGES.map(x=>`<option ${x===s?'selected':''}>${esc(x)}</option>`).join('')}</select></article>`).join('')||'<p class="muted small">Nenhuma oportunidade</p>'}</section>`}).join('');}
+  async function loadArchived(){const [c,o]=await Promise.all([sb.from('companies').select('*').not('archived_at','is',null).order('archived_at',{ascending:false}),sb.from('opportunities').select('*').not('archived_at','is',null).order('archived_at',{ascending:false})]);if(c.error||o.error)return;$('archived-companies-table').innerHTML=(c.data||[]).map(x=>`<tr><td>${esc(x.company_name)}</td><td>${esc(x.cnpj||'—')}</td><td>${date(x.archived_at)}</td><td><button class="table-btn" data-restore-company="${x.id}">Restaurar</button></td></tr>`).join('');$('archived-opportunities-table').innerHTML=(o.data||[]).map(x=>`<tr><td>${esc(x.title)}</td><td>${esc(x.stage)}</td><td>${date(x.archived_at)}</td><td><button class="table-btn" data-restore-opportunity="${x.id}">Restaurar</button></td></tr>`).join('');}
+  function setView(v){activeView=v;document.querySelectorAll('.view').forEach(e=>e.classList.add('hidden'));$(v+'-view').classList.remove('hidden');document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===v));$('page-title').textContent=({overview:'Visão geral',companies:'Base de empresas',opportunities:'Oportunidades comerciais',pipeline:'Funil comercial',archived:'Registros arquivados'})[v];}
+  function openCompany(id){$('company-form').reset();$('company-id').value='';$('company-dialog-title').textContent='Nova empresa';if(id){const c=companies.find(x=>x.id===id);if(!c)return;$('company-id').value=id;$('company-dialog-title').textContent='Editar empresa';for(const [field,key] of [['company_name','company_name'],['trade_name','trade_name'],['cnpj','cnpj'],['segment','segment'],['state','state'],['city','city'],['phone','phone'],['company-email','email'],['contact','contact'],['source','source'],['company-notes','notes']])$(field).value=c[key]||'';} $('company-dialog').showModal();}
+  async function saveCompany(e){e.preventDefault();const id=$('company-id').value;const payload={company_name:$('company_name').value.trim(),trade_name:$('trade_name').value.trim()||null,cnpj:$('cnpj').value.trim()||null,segment:$('segment').value.trim()||null,state:$('state').value.trim().toUpperCase()||null,city:$('city').value.trim()||null,phone:$('phone').value.trim()||null,email:$('company-email').value.trim()||null,contact:$('contact').value.trim()||null,source:$('source').value.trim()||null,notes:$('company-notes').value.trim()||null,updated_at:new Date().toISOString()};const r=id?await sb.from('companies').update(payload).eq('id',id).select().single():await sb.from('companies').insert({...payload,created_by:user.id,responsible_user_id:user.id}).select().single();if(r.error){msg('Erro ao salvar empresa: '+r.error.message,'error');return;}$('company-dialog').close();await loadAll();msg('Empresa salva.','success');}
+  function openOpportunity(id){if(!companies.length){msg('Cadastre uma empresa antes de criar uma oportunidade.','error');return}$('opportunity-form').reset();$('opportunity-id').value='';$('opportunity-dialog-title').textContent='Nova oportunidade';$('opportunity-stage').value=STAGES[0];if(id){const o=opportunities.find(x=>x.id===id);if(!o)return;$('opportunity-id').value=id;$('opportunity-dialog-title').textContent='Editar oportunidade';$('opportunity-company').value=o.company_id;$('opportunity-title').value=o.title||'';$('opportunity-product').value=o.product||'Outro';$('estimated-value').value=o.estimated_value??'';$('partner-institution').value=o.partner_institution||'';$('opportunity-stage').value=o.stage||STAGES[0];$('next-action').value=o.next_action||'';$('next-action-at').value=o.next_action_at?new Date(new Date(o.next_action_at).getTime()-new Date(o.next_action_at).getTimezoneOffset()*60000).toISOString().slice(0,16):'';$('outcome').value=o.outcome||'';$('opportunity-notes').value=o.notes||'';} $('opportunity-dialog').showModal();}
+  async function saveOpportunity(e){e.preventDefault();const id=$('opportunity-id').value;const v=$('estimated-value').value;const dt=$('next-action-at').value;const payload={company_id:$('opportunity-company').value,title:$('opportunity-title').value.trim(),product:$('opportunity-product').value,estimated_value:v===''?null:Number(v),partner_institution:$('partner-institution').value.trim()||null,stage:$('opportunity-stage').value,next_action:$('next-action').value.trim()||null,next_action_at:dt?new Date(dt).toISOString():null,outcome:$('outcome').value.trim()||null,notes:$('opportunity-notes').value.trim()||null,updated_at:new Date().toISOString()};const r=id?await sb.from('opportunities').update(payload).eq('id',id).select().single():await sb.from('opportunities').insert({...payload,created_by:user.id,responsible_user_id:user.id}).select().single();if(r.error){msg('Erro ao salvar oportunidade: '+r.error.message,'error');return;}$('opportunity-dialog').close();await loadAll();msg('Oportunidade salva.','success');}
+  async function archive(table,id){const label=table==='companies'?'empresa':'oportunidade';if(table==='companies'&&opportunities.some(o=>o.company_id===id)){if(!confirm('Esta empresa tem oportunidades. Arquivar a empresa não arquivará automaticamente as oportunidades. Continuar?'))return;}else if(!confirm(`Arquivar este ${label}? Ele poderá ser restaurado depois.`))return;const {error}=await sb.from(table).update({archived_at:new Date().toISOString(),archived_by:user.id,updated_at:new Date().toISOString()}).eq('id',id);if(error){msg('Não foi possível arquivar: '+error.message,'error');return;}await loadAll();msg('Registro arquivado.','success');}
+  async function restore(table,id){const {error}=await sb.from(table).update({archived_at:null,archived_by:null,updated_at:new Date().toISOString()}).eq('id',id);if(error){msg('Não foi possível restaurar: '+error.message,'error');return;}await loadAll();msg('Registro restaurado.','success');}
+  async function start(){if(!init())return;$('login-form').addEventListener('submit',async e=>{e.preventDefault();authMsg('Validando acesso...');const {data,error}=await sb.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error){authMsg('Não foi possível entrar. Confira o e-mail e a senha.','error');return;}user=data.user;authMsg('');showApp();await loadAll();});$('logout-btn').addEventListener('click',async()=>{await sb.auth.signOut();user=null;showLogin();});$('new-company-btn').addEventListener('click',()=>openCompany());$('new-opportunity-btn').addEventListener('click',()=>openOpportunity());$('company-form').addEventListener('submit',saveCompany);$('opportunity-form').addEventListener('submit',saveOpportunity);document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>$(b.dataset.close).close()));document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.go)));$('company-search').addEventListener('input',renderCompanies);$('company-state-filter').addEventListener('change',renderCompanies);['opportunity-search','opportunity-stage-filter','product-filter'].forEach(id=>$(id).addEventListener(id==='opportunity-search'?'input':'change',renderOpportunities));$('companies-table').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.editCompany)openCompany(b.dataset.editCompany);if(b.dataset.archiveCompany)archive('companies',b.dataset.archiveCompany)});$('opportunities-table').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.editOpportunity)openOpportunity(b.dataset.editOpportunity);if(b.dataset.archiveOpportunity)archive('opportunities',b.dataset.archiveOpportunity)});$('pipeline-board').addEventListener('change',async e=>{if(!e.target.matches('[data-stage-id]'))return;const {error}=await sb.from('opportunities').update({stage:e.target.value,updated_at:new Date().toISOString()}).eq('id',e.target.dataset.stageId);if(error)msg('Erro ao atualizar etapa: '+error.message,'error');else await loadAll();});$('archived-view').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.restoreCompany)restore('companies',b.dataset.restoreCompany);if(b.dataset.restoreOpportunity)restore('opportunities',b.dataset.restoreOpportunity)});const {data:{session}}=await sb.auth.getSession();if(session?.user){user=session.user;showApp();await loadAll();}else showLogin();sb.auth.onAuthStateChange(async(event,session)=>{if(event==='SIGNED_OUT'||!session){user=null;showLogin();}});}
+  document.addEventListener('DOMContentLoaded',start);
 })();
